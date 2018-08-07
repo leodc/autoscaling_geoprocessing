@@ -1,0 +1,55 @@
+{
+    "variables": {
+        "aws_access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+        "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}"
+    },
+
+    "builders": [{
+        "type": "amazon-ebs",
+        "access_key": "{{user `aws_access_key`}}",
+        "secret_key": "{{user `aws_secret_key`}}",
+        "region": "us-west-2",
+        "source_ami": "ami-4e79ed36",
+        "instance_type": "m4.large",
+        "ssh_username": "ubuntu",
+        "ami_name": "postgresxl-demo",
+        "ami_groups": "all",
+        "tags": {
+              "Name": "postgresxl-demo"
+        }
+    }],
+
+    "provisioners": [
+    {
+        "type": "shell",
+        "scripts": [
+            "install_postgresxl.sh"
+        ],
+        "pause_before": "30s"
+    },
+    {
+        "type": "file",
+        "source": "leo-IAM-keypair.pem",
+        "destination": "/home/ubuntu/.ssh/id_ecdsa",
+        "direction": "upload"
+    },
+    {
+        "type": "file",
+        "source": "environment",
+        "destination": "/home/ubuntu/environment",
+        "direction": "upload"
+    },
+    {
+        "type": "file",
+        "source": "pgxc_ctl.conf",
+        "destination": "/home/ubuntu/pgxc_ctl.conf",
+        "direction": "upload"
+    },
+    {
+        "type": "shell",
+        "inline": [
+            "chmod 400 /home/ubuntu/.ssh/id_ecdsa",
+            "sudo mv /home/ubuntu/environment /etc/environment"
+        ]
+    }]
+}
