@@ -12,6 +12,7 @@ data "aws_ami" "cluster_ami" {
 }
 
 # availability zones to deploy the instances
+# default -> all availability zones
 data "aws_availability_zones" "all" {
 }
 
@@ -34,4 +35,10 @@ variable "keypair_name"{
   type = "string"
 
   default = "cluster-keypair"
+}
+
+### CONSUL VARIABLES
+variable "consul_server_count" {
+  type = "string"
+  default = "3"
 }

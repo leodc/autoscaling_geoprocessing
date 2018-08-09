@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # update system
-sudo apt-get update
-sudo apt-get upgrade
+sudo su -s /bin/bash -c 'sleep 30 && apt-get update' root
 
 # isntall dependencies
-sudo apt-get install -y bison flex jade libreadline-dev zlib1g-dev make libperl-dev postgresql-server-dev-9.5
+sudo apt-get install -y bison flex jade libreadline-dev zlib1g-dev make libperl-dev postgresql-server-dev-9.5 unzip
 
 # get source code
 wget https://www.postgres-xl.org/downloads/postgres-xl-9.5r1.6.tar.bz2

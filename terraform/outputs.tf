@@ -5,10 +5,14 @@ Output file to highlight customized outputs that are useful
 To see the output after the apply, use the command: "terraform output"
  */
 
- output "public_ip_coordinator" {
-   value = "${aws_instance.coordinator.public_ip}"
- }
-
+ # output "public_ip_coordinator" {
+ #   value = "${aws_instance.coordinator.public_ip}"
+ # }
+ 
  output "public_ip_gtm" {
    value = "${aws_instance.gtm.public_ip}"
+ }
+
+ output "coordinators_load_balancer" {
+   value = "${aws_elb.coordinators.dns_name}"
  }
