@@ -17,11 +17,11 @@ set -e
 if [[ "$1" == "server" ]]; then
   FLAG_AUX="-server -bootstrap-expect=${SERVER_COUNT}"
 else
-  FLAG_AUX="-node-meta=profile:$2"
+  FLAG_AUX=""
 fi
 
 cat >/tmp/consul_flags << EOF
-CONSUL_FLAGS="${FLAG_AUX} -join=${CONSUL_JOIN} -data-dir=/opt/consul/data"
+CONSUL_FLAGS="${FLAG_AUX} -join=${CONSUL_JOIN} -node-meta=profile:$2 -data-dir=/opt/consul/data"
 EOF
 
 if [ -f /tmp/upstart.conf ];
@@ -59,3 +59,4 @@ else
   echo "using upstart"
   sudo start consul
 fi
+

@@ -38,7 +38,29 @@ variable "keypair_name"{
 }
 
 ### CONSUL VARIABLES
-variable "consul_server_count" {
+
+variable "consul_masters" {
+  description = "Number of masters in the consul cluster"
   type = "string"
   default = "3"
+}
+
+
+### POSTGRES-XL VARIABLES
+variable "coordinators_layer" {
+  description = "Default values for the cluster layer"
+  type = "map"
+  default = {
+    "min" = "2"
+    "max" = "5"
+  }
+}
+
+variable "datanode_layer" {
+  description = "Default values for the datanode layer"
+  type = "map"
+  default = {
+    "min" = "4"
+    "max" = "10"
+  }
 }

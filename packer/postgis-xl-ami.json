@@ -47,7 +47,7 @@
       "type": "shell",
       "inline": [
         "sudo mv /tmp/environment /etc/environment",
-        "chmod a+x /home/ubuntu/consul_init.sh"
+        "chmod +x /home/ubuntu/consul_init.sh"
       ]
     },
     {

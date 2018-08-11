@@ -19,7 +19,7 @@ resource "aws_launch_configuration" "coordinators" {
 
   user_data = <<-EOF
               #!/bin/bash
-              SERVER_COUNT="${var.consul_server_count}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client coordinators
+              SERVER_COUNT="${var.consul_masters}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client coordinators
               EOF
 
   lifecycle {
@@ -28,9 +28,9 @@ resource "aws_launch_configuration" "coordinators" {
 }
 
 
-## WORKERS
-resource "aws_launch_configuration" "workers" {
-  name = "workers_asg"
+## DATANODES
+resource "aws_launch_configuration" "datanodes" {
+  name = "datanodes_asg"
 
   image_id = "${data.aws_ami.cluster_ami.image_id}"
   instance_type = "${var.instance_type}"
@@ -39,7 +39,7 @@ resource "aws_launch_configuration" "workers" {
 
   user_data = <<-EOF
               #!/bin/bash
-              SERVER_COUNT="${var.consul_server_count}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client workers
+              SERVER_COUNT="${var.consul_masters}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client datanodes
               EOF
 
   lifecycle {
@@ -90,8 +90,8 @@ resource "aws_autoscaling_group" "coordinators" {
   load_balancers = ["${aws_elb.coordinators.name}"]
   # health_check_type = "ELB"
 
-  min_size = 2
-  max_size = 5
+  min_size = "${lookup(var.coordinators_layer, "min")}"
+  max_size = "${lookup(var.coordinators_layer, "max")}"
 
   tag {
     key = "Name"
@@ -101,17 +101,17 @@ resource "aws_autoscaling_group" "coordinators" {
 }
 
 
-## WORKERS
-resource "aws_autoscaling_group" "workers" {
-  launch_configuration = "${aws_launch_configuration.workers.id}"
+## DATANODES
+resource "aws_autoscaling_group" "datanodes" {
+  launch_configuration = "${aws_launch_configuration.datanodes.id}"
   availability_zones = ["${data.aws_availability_zones.all.names}"]
 
-  min_size = 4
-  max_size = 10
+  min_size = "${lookup(var.datanode_layer, "min")}"
+  max_size = "${lookup(var.datanode_layer, "max")}"
 
   tag {
     key = "Name"
-    value = "Worker"
+    value = "Datanode"
     propagate_at_launch = true
   }
 }
@@ -134,7 +134,7 @@ resource "aws_instance" "gtm_proxy" {
 
   provisioner "remote-exec" {
     inline = [
-      "SERVER_COUNT=${var.consul_server_count} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_proxy"
+      "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_proxy"
     ]
 
     connection {
@@ -160,7 +160,7 @@ resource "aws_instance" "gtm_slave" {
 
   provisioner "remote-exec" {
     inline = [
-      "SERVER_COUNT=${var.consul_server_count} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_slave"
+      "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_slave"
     ]
 
     connection {
@@ -196,6 +196,18 @@ resource "aws_instance" "gtm" {
     }
   }
 
+  # add cluster configuration file
+  provisioner "file" {
+    source = "resources/pgxc_ctl.conf"
+    destination = "/home/ubuntu/pgxc_ctl.conf"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
   # upload setup script
   provisioner "file" {
     source = "resources/init_postgres_xl_master.sh"
@@ -208,14 +220,28 @@ resource "aws_instance" "gtm" {
     }
   }
 
+  # upload monitor script
+  provisioner "file" {
+    source = "resources/monitor.pl"
+    destination = "/home/ubuntu/monitor.pl"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
   # run setup cluster
   provisioner "remote-exec" {
     inline = [
-      "chmod +x /home/ubuntu/init_postgres_xl_master.sh",
       "chmod 400 /home/ubuntu/.ssh/id_ecdsa",
-      "/home/ubuntu/init_postgres_xl_master.sh",
-      "SERVER_COUNT=${var.consul_server_count} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm"
+      "chmod +x /home/ubuntu/init_postgres_xl_master.sh",
+      "MASTER_IP=${aws_instance.gtm.private_ip} /home/ubuntu/init_postgres_xl_master.sh",
+      "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm"
     ]
+    # "nohup perl /home/ubuntu/monitor.pl &",
+    # "sleep 1"
 
     connection {
       type     = "ssh"
