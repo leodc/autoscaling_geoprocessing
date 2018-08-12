@@ -1,0 +1,84 @@
+{
+  "variables": {
+    "aws_access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+    "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "instance_type": "m4.large"
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "region": "us-west-2",
+      "source_ami": "ami-4e79ed36",
+      "instance_type": "{{user `instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ami_name": "master-postgis-xl-{{timestamp}}",
+      "ami_groups": "all",
+      "tags": {
+        "Name": "master-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      },
+      "run_tags": {
+        "Name": "master-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      }
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "resources/environment",
+      "destination": "/tmp/environment"
+    },
+    {
+      "type": "file",
+      "source": "resources/cluster-keypair.pem",
+      "destination": "/home/ubuntu/.ssh/id_ecdsa"
+    },
+    {
+      "type": "file",
+      "source": "resources/consul/consul.service",
+      "destination": "/home/ubuntu/consul.service"
+    },
+    {
+      "type": "file",
+      "source": "resources/consul/consul_init.sh",
+      "destination": "/home/ubuntu/consul_init.sh"
+    },
+    {
+      "type": "file",
+      "source": "resources/postgres-xl/pgxc_ctl.conf",
+      "destination": "/home/ubuntu/pgxc_ctl.conf"
+    },
+    {
+      "type": "file",
+      "source": "resources/postgres-xl/init_postgres_xl_master.sh",
+      "destination": "/home/ubuntu/init_postgres_xl_master.sh"
+    },
+    {
+      "type": "file",
+      "source": "resources/postgres-xl/monitor.pl",
+      "destination": "/home/ubuntu/monitor.pl"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "sudo mv /tmp/environment /etc/environment",
+        "chmod 400 /home/ubuntu/.ssh/id_ecdsa",
+        "chmod +x /home/ubuntu/consul_init.sh",
+        "chmod +x /home/ubuntu/init_postgres_xl_master.sh"
+      ]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "resources/consul/install_consul.sh",
+        "resources/postgres-xl/install_postgresxl.sh",
+        "resources/postgres-xl/install_postgis.sh"
+      ]
+    }
+  ]
+}

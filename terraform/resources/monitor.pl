@@ -216,6 +216,7 @@ sub lookDatanodes {
 					my $datanodesCount = $gtmDatanodesCount  + 1;
 
 					## add instance to the cluster
+
 					my $port_a = 40000 + $datanodesCount;
 					my $port_b = 40010 + $datanodesCount;
 

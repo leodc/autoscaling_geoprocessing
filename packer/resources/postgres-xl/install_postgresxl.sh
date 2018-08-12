@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # update system
-sudo su -s /bin/bash -c 'sleep 30 && apt-get update' root
+# sudo su -s /bin/bash -c 'sleep 30 && apt-get update' root
 
 # isntall dependencies
 sudo apt-get install -y bison flex jade libreadline-dev zlib1g-dev make libperl-dev postgresql-server-dev-9.5 unzip

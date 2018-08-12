@@ -14,14 +14,14 @@
       "source_ami": "ami-4e79ed36",
       "instance_type": "{{user `instance_type`}}",
       "ssh_username": "ubuntu",
-      "ami_name": "postgis-xl-{{timestamp}}",
+      "ami_name": "instance-postgis-xl-{{timestamp}}",
       "ami_groups": "all",
       "tags": {
-        "Name": "postgis-xl",
+        "Name": "instance-postgis-xl",
         "instance_type": "{{user `instance_type`}}"
       },
       "run_tags": {
-        "Name": "postgis-xl",
+        "Name": "instance-postgis-xl",
         "instance_type": "{{user `instance_type`}}"
       }
     }
