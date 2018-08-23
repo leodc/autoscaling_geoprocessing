@@ -14,14 +14,14 @@
       "source_ami": "ami-4e79ed36",
       "instance_type": "{{user `instance_type`}}",
       "ssh_username": "ubuntu",
-      "ami_name": "postgis-xl-{{timestamp}}",
+      "ami_name": "instance-postgis-xl-{{timestamp}}",
       "ami_groups": "all",
       "tags": {
-        "Name": "postgis-xl",
+        "Name": "instance-postgis-xl",
         "instance_type": "{{user `instance_type`}}"
       },
       "run_tags": {
-        "Name": "postgis-xl",
+        "Name": "instance-postgis-xl",
         "instance_type": "{{user `instance_type`}}"
       }
     }
@@ -43,6 +43,8 @@
       "source": "resources/consul/consul_init.sh",
       "destination": "/home/ubuntu/consul_init.sh"
     },
+
+
     {
       "type": "shell",
       "inline": [
@@ -55,7 +57,8 @@
       "scripts": [
         "resources/consul/install_consul.sh",
         "resources/postgres-xl/install_postgresxl.sh",
-        "resources/postgres-xl/install_postgis.sh"
+        "resources/postgres-xl/install_postgis.sh",
+        "resources/prometheus/install_node_exporter.sh"
       ]
     }
   ]

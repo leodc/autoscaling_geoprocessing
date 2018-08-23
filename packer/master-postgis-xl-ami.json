@@ -1,0 +1,78 @@
+{
+  "variables": {
+    "aws_access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+    "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "instance_type": "m4.large"
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "region": "us-west-2",
+      "instance_type": "{{user `instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ami_name": "master-postgis-xl-{{timestamp}}",
+      "ami_groups": "all",
+      "tags": {
+        "Name": "master-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      },
+      "run_tags": {
+        "Name": "master-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      },
+      "source_ami_filter": {
+        "filters": {
+          "name": "instance-postgis-xl-*"
+        },
+        "owners": ["self"],
+        "most_recent": true
+      }
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "resources/cluster-keypair.pem",
+      "destination": "/home/ubuntu/.ssh/id_ecdsa"
+    },
+    {
+      "type": "file",
+      "source": "resources/postgres-xl/pgxc_ctl.conf",
+      "destination": "/home/ubuntu/pgxc_ctl.conf"
+    },
+    {
+      "type": "file",
+      "source": "resources/prometheus/prometheus.yml",
+      "destination": "/home/ubuntu/prometheus.yml"
+    },
+    {
+      "type": "file",
+      "source": "resources/postgres-xl/init_postgres_xl_master.sh",
+      "destination": "/home/ubuntu/init_postgres_xl_master.sh"
+    },
+    {
+      "type": "file",
+      "source": "resources/data/osm_points.csv",
+      "destination": "/home/ubuntu/osm_points.csv"
+    },
+
+
+    {
+      "type": "shell",
+      "inline": [
+        "chmod 400 /home/ubuntu/.ssh/id_ecdsa",
+        "chmod +x /home/ubuntu/init_postgres_xl_master.sh"
+      ]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "resources/prometheus/install_consul_exporter.sh"
+      ]
+    }
+  ]
+}

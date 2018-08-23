@@ -7,18 +7,133 @@ provider "aws" {
 }
 
 
+############################################# ASG POLICY
+## COORDINATORS
+resource "aws_autoscaling_policy" "coordinators" {
+  name = "coordinators-autoplicy"
+  scaling_adjustment = 1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = "${aws_autoscaling_group.coordinators.name}"
+}
+
+
+resource "aws_autoscaling_policy" "coordinators-down" {
+  name = "coordinators-autoplicy-down"
+  scaling_adjustment = -1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = "${aws_autoscaling_group.coordinators.name}"
+}
+
+## DATANODES
+resource "aws_autoscaling_policy" "datanodes" {
+  name = "datanodes-autoplicy"
+  scaling_adjustment = 1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = "${aws_autoscaling_group.datanodes.name}"
+}
+
+
+resource "aws_autoscaling_policy" "datanodes-down" {
+  name = "datanodes-autoplicy-down"
+  scaling_adjustment = -1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = "${aws_autoscaling_group.datanodes.name}"
+}
+
+
+############################################# ALARMS
+## COORDINATORS
+resource "aws_cloudwatch_metric_alarm" "coordinators" {
+  alarm_name = "coordinators-alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "60"
+  statistic = "Average"
+  threshold = "60"
+
+  dimensions {
+    AutoScalingGroupName = "${aws_autoscaling_group.coordinators.name}"
+  }
+
+  alarm_description = "This metric monitor EC2 instance cpu utilization"
+  alarm_actions = ["${aws_autoscaling_policy.coordinators.arn}"]
+}
+
+resource "aws_cloudwatch_metric_alarm" "coordinators-down" {
+  alarm_name = "coordinators-alarm-down"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "60"
+  statistic = "Average"
+  threshold = "10"
+
+  dimensions {
+    AutoScalingGroupName = "${aws_autoscaling_group.coordinators.name}"
+  }
+
+  alarm_description = "This metric monitor EC2 instance cpu utilization"
+  alarm_actions = ["${aws_autoscaling_policy.coordinators-down.arn}"]
+}
+
+
+## DATANODES
+resource "aws_cloudwatch_metric_alarm" "datanodes" {
+  alarm_name = "datanodes-alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "60"
+  statistic = "Average"
+  threshold = "60"
+
+  dimensions {
+    AutoScalingGroupName = "${aws_autoscaling_group.datanodes.name}"
+  }
+
+  alarm_description = "This metric monitor EC2 instance cpu utilization"
+  alarm_actions = ["${aws_autoscaling_policy.datanodes.arn}"]
+}
+
+resource "aws_cloudwatch_metric_alarm" "datanodes-down" {
+  alarm_name = "datanodes-alarm-down"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "60"
+  statistic = "Average"
+  threshold = "10"
+
+  dimensions {
+    AutoScalingGroupName = "${aws_autoscaling_group.datanodes.name}"
+  }
+
+  alarm_description = "This metric monitor EC2 instance cpu utilization"
+  alarm_actions = ["${aws_autoscaling_policy.datanodes-down.arn}"]
+}
+
 ############################################# CLUSTER CONFIGURATION
 ## COORDINATORS
 resource "aws_launch_configuration" "coordinators" {
   name = "coordinators_asg"
 
-  image_id = "${data.aws_ami.cluster_ami.image_id}"
+  image_id = "${data.aws_ami.cluster_instance_ami.image_id}"
   instance_type = "${var.instance_type}"
   security_groups = [ "${aws_security_group.cluster_security_group.id}" ]
   key_name = "${var.keypair_name}"
 
   user_data = <<-EOF
               #!/bin/bash
+              nohup /home/ubuntu/node_exporter-0.16.0.linux-amd64/node_exporter &
               SERVER_COUNT="${var.consul_masters}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client coordinators
               EOF
 
@@ -32,13 +147,14 @@ resource "aws_launch_configuration" "coordinators" {
 resource "aws_launch_configuration" "datanodes" {
   name = "datanodes_asg"
 
-  image_id = "${data.aws_ami.cluster_ami.image_id}"
+  image_id = "${data.aws_ami.cluster_instance_ami.image_id}"
   instance_type = "${var.instance_type}"
   security_groups = [ "${aws_security_group.cluster_security_group.id}" ]
   key_name = "${var.keypair_name}"
 
   user_data = <<-EOF
               #!/bin/bash
+              nohup /home/ubuntu/node_exporter-0.16.0.linux-amd64/node_exporter &
               SERVER_COUNT="${var.consul_masters}" CONSUL_JOIN="${aws_instance.gtm.private_ip}" /bin/bash /home/ubuntu/consul_init.sh client datanodes
               EOF
 
@@ -48,38 +164,6 @@ resource "aws_launch_configuration" "datanodes" {
 }
 
 
-############################################# LOAD BALANCERS
-## COORDINATORS
-resource "aws_elb" "coordinators" {
-  name = "ELB-coordinators"
-
-  security_groups = [ "${aws_security_group.cluster_security_group.id}" ]
-  availability_zones = ["${data.aws_availability_zones.all.names}"]
-
-  # periodically check the health of the EC2 Instances
-  # health_check {
-  #   healthy_threshold = 2
-  #   unhealthy_threshold = 2
-  #   timeout = 3
-  #   interval = 30
-  #   target = "HTTP:30001/"
-  # }
-
-
-
-  listener {
-    # receive
-    lb_port = 80
-    lb_protocol = "http"
-
-    # send
-    instance_port = "30001"
-    instance_protocol = "http"
-  }
-}
-
-
-
 ############################################# CLUSTER DEPLOY
 ## COORDINATORS
 resource "aws_autoscaling_group" "coordinators" {
@@ -87,8 +171,9 @@ resource "aws_autoscaling_group" "coordinators" {
   availability_zones = ["${data.aws_availability_zones.all.names}"]
 
   # load balancer
-  load_balancers = ["${aws_elb.coordinators.name}"]
   # health_check_type = "ELB"
+
+  target_group_arns = ["${aws_lb_target_group.coordinators.arn}"]
 
   min_size = "${lookup(var.coordinators_layer, "min")}"
   max_size = "${lookup(var.coordinators_layer, "max")}"
@@ -117,8 +202,6 @@ resource "aws_autoscaling_group" "datanodes" {
 }
 
 
-
-
 ## GTM Proxy
 resource "aws_instance" "gtm_proxy" {
   # GTM proxy
@@ -127,13 +210,14 @@ resource "aws_instance" "gtm_proxy" {
   }
 
 
-  ami = "${data.aws_ami.cluster_ami.image_id}"
+  ami = "${data.aws_ami.cluster_instance_ami.image_id}"
   instance_type = "${var.instance_type}"                                            # machine specs
   vpc_security_group_ids = [ "${aws_security_group.cluster_security_group.id}" ]    # network group
   key_name = "${var.keypair_name}"                                                  # keypair configured service by amazon
 
   provisioner "remote-exec" {
     inline = [
+      "nohup /home/ubuntu/node_exporter-0.16.0.linux-amd64/node_exporter &",
       "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_proxy"
     ]
 
@@ -153,13 +237,14 @@ resource "aws_instance" "gtm_slave" {
   }
 
 
-  ami = "${data.aws_ami.cluster_ami.image_id}"
+  ami = "${data.aws_ami.cluster_instance_ami.image_id}"
   instance_type = "${var.instance_type}"                                            # machine specs
   vpc_security_group_ids = [ "${aws_security_group.cluster_security_group.id}" ]    # network group
   key_name = "${var.keypair_name}"                                                  # keypair configured service by amazon
 
   provisioner "remote-exec" {
     inline = [
+      "nohup /home/ubuntu/node_exporter-0.16.0.linux-amd64/node_exporter &",
       "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm_slave"
     ]
 
@@ -179,50 +264,15 @@ resource "aws_instance" "gtm" {
     Name = "GTM"
   }
 
-  ami = "${data.aws_ami.cluster_ami.image_id}"                                      # packer created machine
+  ami = "${data.aws_ami.cluster_master_ami.image_id}"                                      # packer created machine
   instance_type = "${var.instance_type}"                                            # machine specs
   vpc_security_group_ids = [ "${aws_security_group.cluster_security_group.id}" ]    # network group
   key_name = "${var.keypair_name}"                                                  # keypair configured service by amazon
 
-  # add shh key
-  provisioner "file" {
-    source = "resources/${var.keypair_name}.pem"
-    destination = "/home/ubuntu/.ssh/id_ecdsa"
-
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"
-      private_key = "${file("resources/${var.keypair_name}.pem")}"
-    }
-  }
-
-  # add cluster configuration file
-  provisioner "file" {
-    source = "resources/pgxc_ctl.conf"
-    destination = "/home/ubuntu/pgxc_ctl.conf"
-
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"
-      private_key = "${file("resources/${var.keypair_name}.pem")}"
-    }
-  }
-
-  # upload setup script
-  provisioner "file" {
-    source = "resources/init_postgres_xl_master.sh"
-    destination = "/home/ubuntu/init_postgres_xl_master.sh"
-
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"
-      private_key = "${file("resources/${var.keypair_name}.pem")}"
-    }
-  }
 
   # upload monitor script
   provisioner "file" {
-    source = "resources/monitor.pl"
+    source = "resources/monitor/monitor.pl"
     destination = "/home/ubuntu/monitor.pl"
 
     connection {
@@ -232,16 +282,43 @@ resource "aws_instance" "gtm" {
     }
   }
 
+
+  provisioner "file" {
+    source = "resources/test/insert_data.sh"
+    destination = "/home/ubuntu/insert_data.sh"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
   # run setup cluster
   provisioner "remote-exec" {
     inline = [
-      "chmod 400 /home/ubuntu/.ssh/id_ecdsa",
-      "chmod +x /home/ubuntu/init_postgres_xl_master.sh",
       "MASTER_IP=${aws_instance.gtm.private_ip} /home/ubuntu/init_postgres_xl_master.sh",
-      "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm"
+      "SERVER_COUNT=${var.consul_masters} CONSUL_JOIN=${aws_instance.gtm.private_ip} /home/ubuntu/consul_init.sh server gtm",
+      "chmod +x /home/ubuntu/insert_data.sh"
     ]
-    # "nohup perl /home/ubuntu/monitor.pl &",
-    # "sleep 1"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  # install monitor tools
+  provisioner "remote-exec" {
+    scripts = [
+      "resources/monitor/install_prometheus.sh",
+      "resources/monitor/start_node_exporter.sh",
+      "resources/monitor/start_consul_exporter.sh",
+      "resources/monitor/install_monitor_script.sh"
+    ]
 
     connection {
       type     = "ssh"
@@ -253,10 +330,142 @@ resource "aws_instance" "gtm" {
 }
 
 
+
+## Monitor
+resource "aws_instance" "monitor" {
+  # master
+  tags {
+    Name = "Monitor"
+  }
+
+  ami = "${var.monitor_instance_ami}"                                               # monitor ami
+  instance_type = "${var.instance_type}"                                            # machine specs
+  vpc_security_group_ids = [ "${aws_security_group.cluster_security_group.id}" ]    # network group
+  key_name = "${var.keypair_name}"                                                  # keypair configured service by amazon
+
+
+  # upload grafana installation script
+  provisioner "file" {
+    source = "resources/monitor/install_grafana.sh"
+    destination = "/home/ubuntu/install_grafana.sh"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod a+x /home/ubuntu/install_grafana.sh",
+      "PROMETHEUS_SOURCE=${aws_instance.gtm.private_ip} /home/ubuntu/install_grafana.sh"
+    ]
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+}
+
+
+
+## Monitor
+resource "aws_instance" "api" {
+  # master
+  tags {
+    Name = "API"
+  }
+
+  ami = "${var.monitor_instance_ami}"                                               # monitor ami
+  instance_type = "${var.instance_type}"                                            # machine specs
+  vpc_security_group_ids = [ "${aws_security_group.cluster_security_group.id}" ]    # network group
+  key_name = "${var.keypair_name}"                                                  # keypair configured service by amazon
+
+
+  provisioner "file" {
+    source = "resources/api/api.js"
+    destination = "/home/ubuntu/api.js"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  provisioner "file" {
+    source = "resources/api/package.json"
+    destination = "/home/ubuntu/package.json"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  provisioner "file" {
+    source = "resources/api/install_api.sh"
+    destination = "/home/ubuntu/install_api.sh"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  provisioner "file" {
+    source = "resources/test/locustfile.py"
+    destination = "/home/ubuntu/locustfile.py"
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod +x /home/ubuntu/install_api.sh",
+      "PGHOST=${aws_lb.coordinators.dns_name} /home/ubuntu/install_api.sh"
+    ]
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+
+  provisioner "remote-exec" {
+    scripts = [
+      "resources/test/install_locust.sh"
+    ]
+
+    connection {
+      type     = "ssh"
+      user     = "ubuntu"
+      private_key = "${file("resources/${var.keypair_name}.pem")}"
+    }
+  }
+}
+
 ############################################# NETWORK
 # create security group that allows traffic in the needed port
 resource "aws_security_group" "cluster_security_group" {
   name = "postgis_cluster_security_group"
+  vpc_id = "${data.aws_vpc.default.id}"
 
   # open port range
   ingress {
