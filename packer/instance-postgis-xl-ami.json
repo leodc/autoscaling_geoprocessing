@@ -1,0 +1,65 @@
+{
+  "variables": {
+    "aws_access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+    "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "instance_type": "m4.large"
+  },
+
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "region": "us-west-2",
+      "source_ami": "ami-4e79ed36",
+      "instance_type": "{{user `instance_type`}}",
+      "ssh_username": "ubuntu",
+      "ami_name": "instance-postgis-xl-{{timestamp}}",
+      "ami_groups": "all",
+      "tags": {
+        "Name": "instance-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      },
+      "run_tags": {
+        "Name": "instance-postgis-xl",
+        "instance_type": "{{user `instance_type`}}"
+      }
+    }
+  ],
+
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "resources/environment",
+      "destination": "/tmp/environment"
+    },
+    {
+      "type": "file",
+      "source": "resources/consul/consul.service",
+      "destination": "/home/ubuntu/consul.service"
+    },
+    {
+      "type": "file",
+      "source": "resources/consul/consul_init.sh",
+      "destination": "/home/ubuntu/consul_init.sh"
+    },
+
+
+    {
+      "type": "shell",
+      "inline": [
+        "sudo mv /tmp/environment /etc/environment",
+        "chmod +x /home/ubuntu/consul_init.sh"
+      ]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "resources/consul/install_consul.sh",
+        "resources/postgres-xl/install_postgresxl.sh",
+        "resources/postgres-xl/install_postgis.sh",
+        "resources/prometheus/install_node_exporter.sh"
+      ]
+    }
+  ]
+}

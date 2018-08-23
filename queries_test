@@ -1,0 +1,68 @@
+# test queries
+# from the coordinator
+
+# create db
+createdb demo -p 30001
+
+# connect
+psql -p 30001 demo
+
+
+CREATE TABLE disttab(col1 int, col2 int, col3 text) DISTRIBUTE BY HASH(col1);
+CREATE TABLE repltab(col1 int, col2 int, col3 text) DISTRIBUTE BY REPLICATION;
+
+INSERT INTO disttab SELECT generate_series(1,10000), generate_series(101, 200), 'foo';
+INSERT INTO repltab SELECT generate_series(1,10000), generate_series(101, 200), 'foo';
+
+# And they must not be all on the same node. xc_node_id is a system column which shows the originating datanode for each row. Note that the distribution can be slightly uneven because of the HASH function
+SELECT xc_node_id, count(*) FROM disttab GROUP BY xc_node_id;
+
+
+# For replicated tables, we expect all rows to come from a single datanode (even though the other node has a copy too).
+SELECT xc_node_id, count(*) FROM repltab GROUP BY xc_node_id;
+
+
+
+
+
+
+
+# connect to postgis table
+psql -p 30001 -d postgis_test -c "CREATE EXTENSION postgis;"
+
+
+################################################################
+create table geotable(id serial, the_name text) DISTRIBUTE BY REPLICATION;
+SELECT AddGeometryColumn('public', 'geotable', 'the_geom', 4326, 'POINT', 2);
+INSERT INTO geotable ( the_geom, the_name ) VALUES ( ST_GeomFromText('POINT(-126.4 45.32)', 4326), 'A Place');
+####################################
+
+SELECT * FROM pgr_dijkstraCost('SELECT gid AS id, source, target, length AS cost FROM ways', 2146, 22737, directed := false);
+
+############
+SELECT xc_node_id, count(*) FROM routing GROUP BY xc_node_id;
+
+###########################
+35.193.44.81 -> pg_hba.conf
+PGDATA=/home/ubuntu/DATA/pgxl/nodes/coord_master.1/ pg_ctl reload
+
+
+COPY ways FROM '/home/ubuntu/ways.csv' DELIMITER ',' csv;
+
+
+################################
+select pgr_createTopology('ways', 0.000001);
+
+
+###################################
+/home/ubuntu/DATA/pgxl/nodes/coord_master.1/pg_log
+
+STATEMENT:  SELECT * FROM pgr_dijkstra('SELECT gid AS id, source, target, length AS cost FROM ways', 2146, 22737, directed := false);
+LOG:  Getting relation statistics for public.ways
+LOG:  Getting detailed statistics for public.ways
+LOG:  server process (PID 2398) was terminated by signal 11: Segmentation fault
+DETAIL:  Failed process was running: SELECT * FROM pgr_dijkstra('SELECT gid AS id, source, target, length AS cost FROM ways', 2146, 22737, directed := false);
+LOG:  terminating any other active server processes
+WARNING:  terminating connection because of crash of another server process
+DETAIL:  The postmaster has commanded this server process to roll back the current transaction and exit, because another server process exited abnormally and possibly corrupted shared memory.
+HINT:  In a moment you should be able to reconnect to the database and repeat your command.
